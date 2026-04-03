@@ -2,6 +2,11 @@ use cpal::{
     FromSample, Sample, SampleFormat, SizedSample,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
+use std::collections::HashMap;
+
+use crate::music::notes::octave_up;
+
+mod music;
 
 /// Silence Writer to Buffer
 fn write_silence<T: Sample>(data: &mut [T], _: &cpal::OutputCallbackInfo) {
@@ -27,13 +32,18 @@ pub fn run<T>(device: &cpal::Device, config: cpal::StreamConfig) -> Result<(), a
 where
     T: SizedSample + FromSample<f32>,
 {
+    let mut octave: HashMap<&str, f32> = music::notes::init_octave();
+
+    //test octave changes
+    octave_up(&mut octave);
+
     let sample_rate = config.sample_rate as f32;
     let channels = config.channels as usize;
 
     let mut sample_clock = 0f32;
     let mut next_value = move || {
         sample_clock = (sample_clock + 1.0) % sample_rate;
-        (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()
+        (sample_clock * octave["A"] * std::f32::consts::PI / sample_rate).sin()
     };
 
     let err_fn = |err| eprintln!("an error occurred on stream: {err}");
@@ -48,6 +58,7 @@ where
     )?;
     stream.play()?;
 
+    //duration of note being held
     std::thread::sleep(std::time::Duration::from_millis(1000));
 
     Ok(())
