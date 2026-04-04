@@ -9,6 +9,31 @@ pub enum NoteError {
     OctaveRaise,
 }
 
+//Allow multi voicing
+pub struct Voice {
+    pub frequency: f32,
+    pub sample_clock: f32,
+    pub active: bool,
+}
+
+impl Voice {
+    pub fn new(frequency: f32) -> Self {
+        Self {
+            frequency,
+            sample_clock: 0.0,
+            active: true,
+        }
+    }
+
+    pub fn next_sample(&mut self, sample_rate: f32) -> f32 {
+        if !self.active {
+            return 0.0;
+        }
+        self.sample_clock = (self.sample_clock + 1.0) % sample_rate;
+        (self.sample_clock * self.frequency * 2.0 * std::f32::consts::PI / sample_rate).sin()
+    }
+}
+
 /// Init HashMap of notes in base octave
 ///
 /// The default root note is C4 at 261.626 [and respective notes]
