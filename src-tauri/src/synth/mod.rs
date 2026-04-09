@@ -1,9 +1,10 @@
 mod register;
-use cpal::SampleFormat;
 use cpal::traits::{DeviceTrait, HostTrait};
-use rusynth::music_engine::notes::{Voice, init_octave};
+use cpal::SampleFormat;
+use rusynth::music_engine::notes::{init_octave, Voice};
 
-fn main() {
+#[tauri::command]
+pub fn invoke_synth() {
     //support for other audio devices must be enabled at compile time
     // #[allow(unused_mut, unused_assignments)]
     // let mut jack_host_id = Err(HostUnavailable);

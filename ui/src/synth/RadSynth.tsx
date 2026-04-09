@@ -1,5 +1,5 @@
 import type { NodeCallbacks } from "../components/canvas/types";
-
+import { invoke } from "@tauri-apps/api/core";
 /**
  * Adds a synth node to the canvas.
  *
@@ -14,6 +14,10 @@ export function createSynth(
   ) => void,
   style = "",
 ) {
+  function invokeSynth() {
+    invoke("invoke_synth");
+  }
+
   addNode(192, 128, (id, { onRemove, onResizeStart }) => (
     <div
       className={"border border-black rounded flex flex-col " + style}
@@ -30,8 +34,15 @@ export function createSynth(
           </span>
         </div>
       </header>
-      <div className="flex-1">
-        <span></span>
+      <div className="w-full h-full flex flex-1 justify-items-center">
+        <span>
+          <button
+            onClick={invokeSynth}
+            className="px-4 py-2 bg-neutral-200 text-neutral-800 cursor-pointer"
+          >
+            Sound
+          </button>
+        </span>
       </div>
       <div className="flex justify-end p-1">
         <div
@@ -39,9 +50,24 @@ export function createSynth(
           onMouseDown={(e) => onResizeStart(e, id)}
         >
           <svg viewBox="0 0 12 12" className="w-full h-full text-neutral-400">
-            <path d="M11 1v10H1" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M11 5v6H5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M11 9v2H9" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path
+              d="M11 1v10H1"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M11 5v6H5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M11 9v2H9"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
           </svg>
         </div>
       </div>
