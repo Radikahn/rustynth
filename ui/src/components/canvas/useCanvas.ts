@@ -3,6 +3,7 @@ import type { Camera, CanvasNode, DragState } from "./types";
 
 export function useCanvas(
   onNodeMove: (id: string, x: number, y: number) => void,
+  onNodeResize: (id: string, width: number, height: number) => void,
 ) {
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0 });
   const dragRef = useRef<DragState | null>(null);
@@ -43,6 +44,24 @@ export function useCanvas(
     [],
   );
 
+  const handleResizeStart = useCallback(
+    (e: MouseEvent, id: string, width: number, height: number) => {
+      dragRef.current = {
+        type: "resize",
+        nodeId: id,
+        startMouseX: e.clientX,
+        startMouseY: e.clientY,
+        startX: 0,
+        startY: 0,
+        startWidth: width,
+        startHeight: height,
+      };
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    [],
+  );
+
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       const drag = dragRef.current;
@@ -55,9 +74,18 @@ export function useCanvas(
         setCamera({ x: drag.startX + dx, y: drag.startY + dy });
       } else if (drag.type === "node" && drag.nodeId) {
         onNodeMove(drag.nodeId, drag.startX + dx, drag.startY + dy);
+      } else if (
+        drag.type === "resize" &&
+        drag.nodeId &&
+        drag.startWidth !== undefined &&
+        drag.startHeight !== undefined
+      ) {
+        const newWidth = Math.max(96, drag.startWidth + dx);
+        const newHeight = Math.max(64, drag.startHeight + dy);
+        onNodeResize(drag.nodeId, newWidth, newHeight);
       }
     },
-    [onNodeMove],
+    [onNodeMove, onNodeResize],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -69,6 +97,7 @@ export function useCanvas(
     containerRef,
     handlePanStart,
     handleNodeDragStart,
+    handleResizeStart,
     handleMouseMove,
     handleMouseUp,
   };
