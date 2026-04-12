@@ -1,65 +1,69 @@
+use std::collections::HashMap;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
+
 use cpal::{
-    FromSample, Sample, SizedSample,
+    FromSample, Sample, SizedSample, Stream,
     traits::{DeviceTrait, StreamTrait},
 };
-use rusynth::music_engine::notes::Voice;
+use crate::synth::SynthSlot;
 
-/// Silence Writer to Buffer
-fn write_silence<T: Sample>(data: &mut [T], _: &cpal::OutputCallbackInfo) {
-    for sample in data.iter_mut() {
-        *sample = Sample::EQUILIBRIUM;
-    }
-}
-
-/// Write sample to audio buffer
-fn write_data<T>(output: &mut [T], channels: usize, next_sample: &mut dyn FnMut() -> f32)
-where
-    T: Sample + FromSample<f32>,
-{
-    for frame in output.chunks_mut(channels) {
-        let value: T = T::from_sample(next_sample());
-        for sample in frame.iter_mut() {
-            *sample = value;
-        }
-    }
-}
-
+/// Single shared audio stream that mixes all active synth instances.
 pub fn run<T>(
     device: &cpal::Device,
     config: cpal::StreamConfig,
-    mut voices: Vec<Voice>,
-) -> Result<(), anyhow::Error>
+    channels: usize,
+    sample_rate: f32,
+    slots: Arc<Mutex<HashMap<String, SynthSlot>>>,
+) -> Result<Stream, anyhow::Error>
 where
     T: SizedSample + FromSample<f32>,
 {
-    let sample_rate = config.sample_rate as f32;
-    let channels = config.channels as usize;
-
-    let max_polyphony = voices.len() as f32;
-    let mut next_value = move || {
-        let mut mix = 0.0f32;
-
-        for voice in voices.iter_mut() {
-            mix += voice.next_sample(sample_rate);
-        }
-
-        mix / max_polyphony
-    };
-
     let err_fn = |err| eprintln!("an error occurred on stream: {err}");
 
     let stream = device.build_output_stream(
         &config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
-            write_data(data, channels, &mut next_value)
+            let mut slots = slots.lock().unwrap();
+            let active_count = slots
+                .values()
+                .filter(|s| s.playing.load(Ordering::Relaxed))
+                .count();
+
+            if active_count == 0 {
+                for sample in data.iter_mut() {
+                    *sample = Sample::EQUILIBRIUM;
+                }
+                return;
+            }
+
+            let gain = 1.0 / active_count as f32;
+
+            for frame in data.chunks_mut(channels) {
+                let mut mix = 0.0f32;
+                for slot in slots.values_mut() {
+                    if !slot.playing.load(Ordering::Relaxed) {
+                        continue;
+                    }
+                    let mut voice_mix = 0.0f32;
+                    let voice_count = slot.voices.len() as f32;
+                    for voice in slot.voices.iter_mut() {
+                        voice_mix += voice.next_sample(sample_rate);
+                    }
+                    mix += voice_mix / voice_count;
+                }
+                mix *= gain;
+
+                let value: T = T::from_sample(mix);
+                for sample in frame.iter_mut() {
+                    *sample = value;
+                }
+            }
         },
         err_fn,
         None,
     )?;
     stream.play()?;
 
-    //duration of note being held
-    std::thread::sleep(std::time::Duration::from_millis(1000));
-
-    Ok(())
+    Ok(stream)
 }

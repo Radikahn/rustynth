@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import type { NodeCallbacks } from "../components/canvas/types";
 import { invoke } from "@tauri-apps/api/core";
+
 /**
  * Adds a synth node to the canvas.
  *
@@ -14,11 +16,36 @@ export function createSynth(
   ) => void,
   style = "",
 ) {
-  function invokeSynth() {
-    invoke("invoke_synth");
-  }
+  addNode(192, 128, (id, callbacks) => (
+    <SynthNode id={id} style={style} callbacks={callbacks} />
+  ));
+}
 
-  addNode(192, 128, (id, { onRemove, onResizeStart }) => (
+function SynthNode({
+  id,
+  style,
+  callbacks,
+}: {
+  id: string;
+  style: string;
+  callbacks: NodeCallbacks;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    invoke("create_synth", { id }).then(() => setReady(true));
+    return () => {
+      invoke("destroy_synth", { id });
+    };
+  }, [id]);
+
+  const toggle = async () => {
+    const nowPlaying = await invoke<boolean>("toggle_synth", { id });
+    setPlaying(nowPlaying);
+  };
+
+  return (
     <div
       className={"border border-black rounded flex flex-col " + style}
       style={{ width: "100%", height: "100%" }}
@@ -29,7 +56,7 @@ export function createSynth(
             <button
               className="w-4 h-4 rounded-4xl bg-red-300 hover:bg-red-500 transition-all duration-300 cursor-pointer"
               onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => onRemove(id)}
+              onClick={() => callbacks.onRemove(id)}
             />
           </span>
         </div>
@@ -37,17 +64,18 @@ export function createSynth(
       <div className="w-full h-full flex flex-1 justify-items-center">
         <span>
           <button
-            onClick={invokeSynth}
-            className="px-4 py-2 bg-neutral-200 text-neutral-800 cursor-pointer"
+            onClick={toggle}
+            disabled={!ready}
+            className="px-4 py-2 bg-neutral-200 text-neutral-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sound
+            {playing ? "Pause" : "Play"}
           </button>
         </span>
       </div>
       <div className="flex justify-end p-1">
         <div
           className="w-3 h-3 cursor-nwse-resize"
-          onMouseDown={(e) => onResizeStart(e, id)}
+          onMouseDown={(e) => callbacks.onResizeStart(e, id)}
         >
           <svg viewBox="0 0 12 12" className="w-full h-full text-neutral-400">
             <path
@@ -72,5 +100,5 @@ export function createSynth(
         </div>
       </div>
     </div>
-  ));
+  );
 }
