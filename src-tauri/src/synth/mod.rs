@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 pub(crate) struct SynthSlot {
     pub(crate) voices: Vec<Voice>,
     pub(crate) playing: Arc<AtomicBool>,
+    pub(crate) amplitude: f32,
 }
 
 /// Shared mixer state accessed by both the audio callback and Tauri commands.
@@ -77,6 +78,7 @@ pub fn create_synth(id: String, state: tauri::State<'_, SynthManager>) -> Result
     let slot = SynthSlot {
         voices,
         playing: Arc::new(AtomicBool::new(false)),
+        amplitude: 0.0,
     };
 
     state.slots.lock().unwrap().insert(id, slot);
